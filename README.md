@@ -4,16 +4,16 @@
 
 
 <!-- TOC -->
-* [Fan chart](#fan-chart)
-  * [Installation](#installation)
-    * [Manual installation](#manual-installation)
-    * [Using Composer](#using-composer)
-      * [Latest version](#latest-version)
-    * [Using Git](#using-git)
-  * [Configuration](#configuration)
-  * [Usage](#usage)
-  * [Development](#development)
-    * [Run tests](#run-tests)
+- [Fan chart](#fan-chart)
+  - [Installation](#installation)
+    - [Manual installation](#manual-installation)
+    - [Using Composer](#using-composer)
+      - [Latest version](#latest-version)
+    - [Using Git](#using-git)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+  - [Development](#development)
+    - [Run tests](#run-tests)
 <!-- TOC -->
 
 
