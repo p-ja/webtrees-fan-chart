@@ -4,15 +4,30 @@
 
 
 <!-- TOC -->
-* [Fan chart](#fan-chart)
-  * [Installation](#installation)
-    * [Using Composer](#using-composer)
-    * [Using Git](#using-git)
-    * [Manual installation](#manual-installation)
-  * [Enable module](#enable-module)
-  * [Usage](#usage)
-  * [Development](#development)
-    * [Run tests](#run-tests)
+- [Fan chart](#fan-chart)
+  - [Installation](#installation)
+    - [Manual installation](#manual-installation)
+    - [Using Composer](#using-composer)
+      - [Latest version](#latest-version)
+    - [Using Git](#using-git)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+  - [Development](#development)
+    - [Run tests](#run-tests)
+<!-- TOC -->
+
+
+<!-- TOC -->
+- [Fan chart](#fan-chart)
+  - [Installation](#installation)
+    - [Manual installation](#manual-installation)
+    - [Using Composer](#using-composer)
+      - [Latest version](#latest-version)
+    - [Using Git](#using-git)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+  - [Development](#development)
+    - [Run tests](#run-tests)
 <!-- TOC -->
 
 
@@ -41,41 +56,28 @@ To manually install the module, perform the following steps:
 If everything was successful, you should see a subdirectory ``webtrees-fan-chart`` with the unpacked content
 in the ``modules_v4`` directory.
 
-Now the module has to be activated within Webtrees.
-
-#### Configuration
-Go to the control panel (admin section) of your installation and scroll down to the ``Modules`` section. Click
-on ``Charts`` (in subsection Genealogy). Enable the ``Fan chart`` custom module (optionally disable the original
-installed fan chart module) and save your settings.
-
-![Control panel - Module administration](assets/control-panel-modules.png)
-
-#### Usage
-At the charts' menu, you will find a new link called `Fan chart`. Use the provided configuration options
-to adjust the layout of the charts according to your needs.
-
-Right-clicking on an individual opens a tooltip providing more detailed information of the current individual.
+Then follow the steps described in [configuration](#configuration) and [usage](#usage).
 
 
 ### Using Composer
-Typically, to install with [composer](https://getcomposer.org/), just run the following command from the command line, 
+Typically, to install with [composer](https://getcomposer.org/), run the following command from the command line,
 from the root of your Webtrees installation.
 
-``` 
+```shell
 composer require magicsunday/webtrees-fan-chart --update-no-dev
 ```
 
 The module will automatically install into the ``modules_v4`` directory of your Webtrees installation.
 
 To remove the module run:
-```
+```shell
 composer remove magicsunday/webtrees-fan-chart --update-no-dev
 ```
 
 Then follow the steps described in [configuration](#configuration) and [usage](#usage).
 
 #### Latest version
-If you are using the development version of Webtrees (main branch), you may also need to install the development 
+If you are using the development version of Webtrees (main branch), you may also need to install the development
 version of the module. For this, please use the following command:
 ```
 composer require magicsunday/webtrees-fan-chart:dev-master --update-no-dev
@@ -83,27 +85,42 @@ composer require magicsunday/webtrees-fan-chart:dev-master --update-no-dev
 
 
 ### Using Git
-If you are using ``git``, you could also clone the current master branch directly into your ``modules_v4`` directory 
+If you are using ``git``, you could also clone the current master branch directly into your ``modules_v4`` directory
 by calling:
 
-```
+```shell
 git clone https://github.com/magicsunday/webtrees-fan-chart.git modules_v4/webtrees-fan-chart
 ```
 
 Then follow the steps described in [configuration](#configuration) and [usage](#usage).
 
 
-## Development
-To build/update the javascript, run the following commands:
+## Configuration
+Go to the control panel (admin section) of your installation and scroll down to the ``Modules`` section. Click
+on ``Charts`` (in subsection Genealogy). Enable the ``Fan chart`` custom module (optionally disable the original
+installed fan chart module) and save your settings.
 
-```
+![Control panel - Module administration](assets/control-panel-modules.png)
+
+## Usage
+At the charts' menu, you will find a new link called `Fan chart`. Use the provided configuration options
+to adjust the layout of the charts according to your needs.
+
+Right-clicking on an individual opens a tooltip providing more detailed information of the current individual.
+
+
+## Development
+To build/update the JavaScript, run the following commands:
+
+```shell
 nvm install node
-npm install --unsafe-perm --save-dev
+npm install
 npm run prepare
 ```
 
+
 ### Run tests
-```
+```shell
 composer update
 
 composer ci:test

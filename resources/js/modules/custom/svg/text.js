@@ -7,6 +7,7 @@
 
 import * as d3 from "../../lib/d3";
 import Geometry, {MATH_DEG2RAD, MATH_RAD2DEG} from "./geometry";
+import measureText from "../../lib/chart/text/measure"
 
 /**
  * The class handles all the text and path elements.
@@ -33,95 +34,85 @@ export default class Text
     /**
      * Creates all the labels and all dependent elements for a single person.
      *
-     * @param {selection} parent The parent element to which the elements are to be attached
+     * @param {Selection} parent The parent element to which the elements are to be attached
      * @param {Object}    datum  The D3 data object
      */
     createLabels(parent, datum)
     {
         // Inner labels
         if (this.isInnerLabel(datum)) {
-            let parentId = d3.select(parent.node().parentNode).attr("id");
+            const parentId = d3.select(parent.node().parentNode).attr("id");
+            const nameGroups = this.createNamesData(datum);
 
-            // First names
-            if (datum.data.data.firstNames.length) {
-                let pathId1   = this.createPathDefinition(parentId, 0, datum);
-                let textPath1 = parent
+            // The textPath element must be contained individually in a text element, otherwise the exported
+            // chart will not be drawn correctly in Inkscape (actually this is not necessary, the browsers
+            // display the chart correctly).
+
+            nameGroups.forEach((nameGroup, index) => {
+                const availableWidth = this.getAvailableWidth(datum, index);
+                const pathId = this.createPathDefinition(parentId, index, datum);
+                const textPath = parent
                     .append("text")
                     .append("textPath")
-                    .attr("xlink:href", "#" + pathId1)
+                    .attr("href", "#" + pathId)
                     .attr("startOffset", "25%");
 
-                this.addFirstNames(textPath1, datum);
-                this.truncateNames(textPath1, datum, 0);
-            }
-
-            // Last names
-            if (datum.data.data.lastNames.length) {
-                let pathId2   = this.createPathDefinition(parentId, 1, datum);
-                let textPath2 = parent
-                    .append("text")
-                    .append("textPath")
-                    .attr("xlink:href", "#" + pathId2)
-                    .attr("startOffset", "25%");
-
-                this.addLastNames(textPath2, datum);
-                this.truncateNames(textPath2, datum, 1);
-            }
-
-            // If both first and last names are empty, add the full name as an alternative
-            if (!datum.data.data.firstNames.length
-                && !datum.data.data.lastNames.length
-            ) {
-                let pathId1   = this.createPathDefinition(parentId, 0, datum);
-                let textPath1 = parent
-                    .append("text")
-                    .append("textPath")
-                    .attr("xlink:href", "#" + pathId1)
-                    .attr("startOffset", "25%");
-
-                textPath1.append("tspan")
-                    .text(datum.data.data.name);
-
-                this.truncateNames(textPath1, datum, 0);
-            }
+                this.addNameElements(
+                    textPath,
+                    this.truncateNamesData(
+                        textPath,
+                        nameGroup,
+                        availableWidth
+                    )
+                );
+            });
 
             // Alternative names
             if (datum.data.data.alternativeName !== "") {
-                let pathId3   = this.createPathDefinition(parentId, 2, datum);
-                let textPath3 = parent
+                const pathId = this.createPathDefinition(parentId, 2, datum);
+                const availableWidth = this.getAvailableWidth(datum, 2);
+                const nameGroup = this.createAlternativeNamesData(datum);
+
+                const textPath = parent
                     .append("text")
                     .append("textPath")
-                    .attr("xlink:href", "#" + pathId3)
+                    .attr("href", "#" + pathId)
                     .attr("startOffset", "25%")
-                    .attr("class", "wt-chart-box-name-alt")
+                    .classed("wt-chart-box-name-alt", true)
                     .classed("rtl", datum.data.data.isAltRtl);
 
-                this.addAlternativeNames(textPath3, datum);
-                this.truncateNames(textPath3, datum, 2);
+                this.addNameElements(
+                    textPath,
+                    this.truncateNamesData(
+                        textPath,
+                        nameGroup,
+                        availableWidth
+                    )
+                );
             }
 
             // Birth and death date
             if (datum.data.data.timespan !== "") {
-                let pathId4 = this.createPathDefinition(parentId, 3, datum);
-                let textPath4 = parent
+                const pathId = this.createPathDefinition(parentId, 3, datum);
+                const textPath = parent
                     .append("text")
                     .append("textPath")
-                    .attr("xlink:href", "#" + pathId4)
+                    .attr("href", "#" + pathId)
                     .attr("startOffset", "25%")
                     .attr("class", "date");
 
-                textPath4.append("title")
+                textPath.append("title")
                     .text(datum.data.data.timespan);
 
                 // Create a <tspan> element for the time span
-                let tspan = textPath4.append("tspan")
+                const tspan = textPath.append("tspan")
                     .text(datum.data.data.timespan);
 
-                let availableWidth = this.getAvailableWidth(datum, 3);
+                const availableWidth = this.getAvailableWidth(datum, 3);
 
-                if (this.getTextLength(textPath4) > availableWidth) {
-                    textPath4.selectAll("tspan")
-                        .each(this.truncateDate(textPath4, availableWidth));
+                if (this.getTextLength(textPath) > availableWidth) {
+                    textPath.selectAll("tspan")
+                        .each(this.truncateDate(textPath, availableWidth));
 
                     tspan.text(tspan.text() + "\u2026");
                 }
@@ -132,96 +123,85 @@ export default class Text
             // The outermost circles show the complete name and do
             // not distinguish between first name, last name and dates
             if (datum.depth >= 7) {
+                const [first, ...last] = this.createNamesData(datum);
+                const availableWidth = this.getAvailableWidth(datum, 0);
+
+                // Merge the firstname and lastname groups, as we display the whole name in one line
+                const combined = [].concat(first, typeof last[0] !== "undefined" ? last[0] : []);
+
                 let text1 = parent
                     .append("text")
                     .attr("dy", "2px");
 
-                if (datum.data.data.firstNames.length) {
-                    this.addFirstNames(text1, datum);
-                }
+                this.addNameElements(
+                    text1,
+                    this.truncateNamesData(
+                        text1,
+                        combined,
+                        availableWidth
+                    )
+                );
+            } else {
+                const nameGroups = this.createNamesData(datum);
 
-                if (datum.data.data.lastNames.length) {
-                    this.addLastNames(text1, datum, 0.25);
-                }
-
-                // If both first and last names are empty, add the full name as an alternative
-                if (!datum.data.data.firstNames.length
-                    && !datum.data.data.lastNames.length
-                ) {
-                    text1.append("tspan")
-                        .text(datum.data.data.name);
-                }
-
-                this.truncateNames(text1, datum, 0);
-            }
-
-            else {
-                // First names
-                if (datum.data.data.firstNames.length) {
-                    let text2 = parent
+                nameGroups.forEach((nameGroup, index) => {
+                    const availableWidth = this.getAvailableWidth(datum, index);
+                    const text = parent
                         .append("text")
                         .attr("dy", "2px");
 
-                    this.addFirstNames(text2, datum);
-                    this.truncateNames(text2, datum, 0);
-                }
-
-                // Last names
-                if (datum.data.data.lastNames.length) {
-                    let text3 = parent
-                        .append("text")
-                        .attr("dy", "2px");
-
-                    this.addLastNames(text3, datum);
-                    this.truncateNames(text3, datum, 1);
-                }
+                    this.addNameElements(
+                        text,
+                        this.truncateNamesData(
+                            text,
+                            nameGroup,
+                            availableWidth
+                        )
+                    );
+                });
 
                 // Alternative name
                 if (datum.data.data.alternativeName !== "") {
-                    let text4 = parent
+                    const availableWidth = this.getAvailableWidth(datum, 2);
+                    const nameGroup = this.createAlternativeNamesData(datum);
+
+                    const text = parent
                         .append("text")
-                        .attr("dy", "2px")
-                        .attr("class", "wt-chart-box-name-alt");
+                        .attr("dy", "5px")
+                        .classed("wt-chart-box-name-alt", true)
+                        .classed("rtl", datum.data.data.isAltRtl);
 
-                    this.addAlternativeNames(text4, datum);
-                    this.truncateNames(text4, datum, 2);
-                }
-
-                // If both first and last names are empty, add the full name as an alternative
-                if (!datum.data.data.firstNames.length
-                    && !datum.data.data.lastNames.length
-                ) {
-                    let text2 = parent
-                        .append("text")
-                        .attr("dy", "2px");
-
-                    text2.append("tspan")
-                        .text(datum.data.data.name);
-
-                    this.truncateNames(text2, datum, 0);
+                    this.addNameElements(
+                        text,
+                        this.truncateNamesData(
+                            text,
+                            nameGroup,
+                            availableWidth
+                        )
+                    );
                 }
 
                 // Birth and death date
                 if (datum.depth < 6) {
                     // Birth and death date
                     if (datum.data.data.timespan !== "") {
-                        let text5 = parent
+                        const text = parent
                             .append("text")
                             .attr("class", "date")
-                            .attr("dy", "2px");
+                            .attr("dy", "7px");
 
-                        text5.append("title")
+                        text.append("title")
                             .text(datum.data.data.timespan);
 
                         // Create a <tspan> element for the time span
-                        let tspan = text5.append("tspan")
+                        const tspan = text.append("tspan")
                             .text(datum.data.data.timespan);
 
-                        let availableWidth = this.getAvailableWidth(datum, 2);
+                        const availableWidth = this.getAvailableWidth(datum, 2);
 
-                        if (this.getTextLength(text5) > availableWidth) {
-                            text5.selectAll("tspan")
-                                .each(this.truncateDate(text5, availableWidth));
+                        if (this.getTextLength(text) > availableWidth) {
+                            text.selectAll("tspan")
+                                .each(this.truncateDate(text, availableWidth));
 
                             tspan.text(tspan.text() + "\u2026");
                         }
@@ -235,110 +215,190 @@ export default class Text
 
         // Marriage date
         if (this._configuration.showParentMarriageDates && datum.children && (datum.depth < 5)) {
-            let parentId5 = d3.select(parent.node().parentNode).attr("id");
-            let pathId5 = this.createPathDefinition(parentId5, 4, datum);
-            let textPath5 = parent
+            const parentId = d3.select(parent.node().parentNode).attr("id");
+            const pathId = this.createPathDefinition(parentId, 4, datum);
+            const textPath = parent
                 .append("text")
                 .append("textPath")
-                .attr("xlink:href", "#" + pathId5)
+                .attr("href", "#" + pathId)
                 .attr("startOffset", "25%")
                 .attr("class", "date");
 
-            this.addMarriageDate(textPath5, datum);
+            this.addMarriageDate(textPath, datum);
         }
     }
 
     /**
-     * Creates a single <tspan> element for each single given name and append it to the
-     * parent element. The "tspan" element containing the preferred name gets an
-     * additional underline style in order to highlight this one.
+     * Creates the data array for the names in top/bottom layout.
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are to be attached
-     * @param {Object}    datum  The D3 data object containing the individual data
+     * @param {NameElementData} datum
+     *
+     * @return {LabelElementData[][]}
+     *
+     * @private
      */
-    addFirstNames(parent, datum)
+    createNamesData(datum)
     {
-        let i = 0;
+        /** @var {LabelElementData[][]} names */
+        let names = {};
+        /** @var {LabelElementData[]} firstnames */
+        let firstnames = {};
+        /** @var {LabelElementData[]} lastnames */
+        let lastnames = {};
+        let minPosFirstnames = Number.MAX_SAFE_INTEGER;
+        let minPosLastnames = Number.MAX_SAFE_INTEGER;
 
-        for (let firstName of datum.data.data.firstNames) {
-            // Create a <tspan> element for each given name
-            let tspan = parent.append("tspan")
-                .text(firstName);
+        let firstnameOffset = 0;
+        let firstnameMap = new Map();
 
-            // The preferred name
-            if (firstName === datum.data.preferredName) {
-                tspan.attr("class", "preferred");
+        // Iterate over the individual name components and determine their position in the overall
+        // name and insert the component at the corresponding position in the result object.
+        for (let i in datum.data.data.firstNames) {
+            const pos = datum.data.data.name.indexOf(datum.data.data.firstNames[i], firstnameOffset);
+
+            if (pos !== -1) {
+                firstnameOffset = pos + datum.data.data.firstNames[i].length;
+
+                if (pos < minPosFirstnames) {
+                    minPosFirstnames = pos;
+                }
+
+                firstnameMap.set(
+                    pos,
+                    {
+                        label: datum.data.data.firstNames[i],
+                        isPreferred: datum.data.data.firstNames[i] === datum.data.data.preferredName,
+                        isLastName: false,
+                        isNameRtl: datum.data.data.isNameRtl
+                    }
+                );
             }
-
-            // Add some spacing between the elements
-            if (i !== 0) {
-                tspan.attr("dx", "0.25em");
-            }
-
-            ++i;
         }
+
+        names[minPosFirstnames] = [...firstnameMap].map(([, value]) => ( value ));
+
+        let lastnameOffset = 0;
+        let lastnameMap = new Map();
+
+        for (let i in datum.data.data.lastNames) {
+            let pos;
+
+            // Check if last name already exists in first names list, in case first name equals last name
+            do {
+                pos = datum.data.data.name.indexOf(datum.data.data.lastNames[i], lastnameOffset);
+
+                if ((pos !== -1) && firstnameMap.has(pos)) {
+                    lastnameOffset += pos + datum.data.data.lastNames[i].length;
+                }
+            } while ((pos !== -1) && firstnameMap.has(pos));
+
+            if (pos !== -1) {
+                lastnameOffset = pos;
+
+                if (pos < minPosLastnames) {
+                    minPosLastnames = pos;
+                }
+
+                lastnameMap.set(
+                    pos,
+                    {
+                        label: datum.data.data.lastNames[i],
+                        isPreferred: false,
+                        isLastName: true,
+                        isNameRtl: datum.data.data.isNameRtl
+                    }
+                );
+            }
+        }
+
+        names[minPosLastnames] = [...lastnameMap].map(([, value]) => ( value ));
+
+        // Extract the values (keys don't matter anymore)
+        return Object.values(names);
     }
 
     /**
-     * Creates a single <tspan> element for each last name and append it to the parent element.
+     * Creates the data array for the alternative name.
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are to be attached
-     * @param {Object}    datum  The D3 data object containing the individual data
-     * @param {Number}    dx     Additional space offset to add between names
-     */
-    addLastNames(parent, datum, dx = 0)
-    {
-        let i = 0;
-
-        for (let lastName of datum.data.data.lastNames) {
-            // Create a <tspan> element for each last name
-            let tspan = parent.append("tspan")
-                .attr("class", "lastName")
-                .text(lastName);
-
-            // Add some spacing between the elements
-            if (i !== 0) {
-                tspan.attr("dx", "0.25em");
-            }
-
-            if (dx !== 0) {
-                tspan.attr("dx", dx + "em");
-            }
-
-            ++i;
-        }
-    }
-
-    /**
-     * Creates a single <tspan> element for each alternative name and append it to the parent element.
+     * @param {NameElementData} datum
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are to be attached
-     * @param {Object}    datum  The D3 data object containing the individual data
-     * @param {Number}    dx     Delta X offset used to create a small spacing between multiple words
+     * @return {LabelElementData[]}
+     *
+     * @private
      */
-    addAlternativeNames(parent, datum, dx = 0)
+    createAlternativeNamesData(datum)
     {
         let words = datum.data.data.alternativeName.split(/\s+/);
-        let i = 0;
 
-        for (let alternativeName of words) {
-            // Create a <tspan> element for each alternative name
-            let tspan = parent.append("tspan")
-                .text(alternativeName);
+        /** @var {LabelElementData[]} names */
+        let names = [];
 
-            // Add some spacing between the elements
-            if (i !== 0) {
-                tspan.attr("dx", (datum.data.isAltRtl ? -0.25 : 0.25) + "em");
-            }
+        // Append the alternative names
+        names = names.concat(
+            words.map((word) => {
+                return {
+                    label: word,
+                    isPreferred: false,
+                    isLastName: false,
+                    isNameRtl: datum.data.data.isAltRtl
+                }
+            })
+        );
 
-            ++i;
-        }
+        return names;
+    }
+
+    /**
+     * Creates a single <tspan> element for each single name and append it to the
+     * parent element. The "tspan" element containing the preferred name gets an
+     * additional underline style to highlight this one.
+     *
+     * @param {Selection}                       parent The parent element to which the <tspan> elements are to be attached
+     * @param {function(*): LabelElementData[]} data
+     *
+     * @private
+     */
+    addNameElements(parent, data)
+    {
+        parent.selectAll("tspan")
+            .data(data)
+            .enter()
+            .call((g) => {
+                g.append("tspan")
+                    .text(datum => datum.label)
+                    // Add some spacing between the elements
+                    .attr("dx", (datum, index) => {
+                        return index !== 0 ? ((datum.isNameRtl ? -1 : 1) * 0.25) + "em" : null;
+                    })
+                    // Highlight the preferred and last name
+                    .attr("text-decoration", datum => datum.isPreferred ? "underline" : null)
+                    .classed("lastName", datum => datum.isLastName);
+            });
+    }
+
+    /**
+     * Creates the data array for the names.
+     *
+     * @param {Object}             parent
+     * @param {LabelElementData[]} names
+     * @param {number}             availableWidth
+     *
+     * @return {LabelElementData[]}
+     *
+     * @private
+     */
+    truncateNamesData(parent, names, availableWidth)
+    {
+        const fontSize   = parent.style("font-size");
+        const fontWeight = parent.style("font-weight");
+
+        return this.truncateNames(names, fontSize, fontWeight, availableWidth);
     }
 
     /**
      * Creates a single <tspan> element for the marriage date and append it to the parent element.
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are to be attached
+     * @param {Selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are to be attached
      * @param {Object}    datum  The D3 data object containing the individual data
      */
     addMarriageDate(parent, datum)
@@ -351,87 +411,89 @@ export default class Text
     }
 
     /**
-     * Loops over the <tspan> elements and truncates the contained texts.
+     * Truncates the list of names.
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element to which the <tspan> elements are attached
-     * @param {Object}    datum  The D3 data object containing the individual data
-     * @param {Number}    index  The index position of the element in parent container.
+     * @param {LabelElementData[]} names          The names array
+     * @param {string}             fontSize       The font size
+     * @param {number}             fontWeight     The font weight
+     * @param {number}             availableWidth The available width
+     *
+     * @return {LabelElementData[]}
+     *
+     * @private
      */
-    truncateNames(parent, datum, index)
+    truncateNames(names, fontSize, fontWeight, availableWidth)
     {
-        // The total available width that the text can occupy
-        let availableWidth = this.getAvailableWidth(datum, index);
+        let text = names.map(item => item.label).join(" ");
 
-        // Select all not preferred names and not last names
-        // Start truncating from the last element to the first one
-        parent.selectAll("tspan:not(.preferred):not(.lastName)")
-            .nodes()
+        return names
+            // Start truncating from the last element to the first one
             .reverse()
-            .forEach(element => {
-                d3.select(element)
-                    .each(this.truncateText(parent, availableWidth));
-            });
+            .map((name) => {
+                // Select all not preferred and not last names
+                if ((name.isPreferred === false)
+                    && (name.isLastName === false)
+                ) {
+                    if (this.measureText(text, fontSize, fontWeight) > availableWidth) {
+                        // Keep only the first letter
+                        name.label = name.label.slice(0, 1) + ".";
+                        text       = names.map(item => item.label).join(" ");
+                    }
+                }
 
-        // Afterward, the preferred ones if text takes still too much space
-        parent.selectAll("tspan.preferred")
-            .each(this.truncateText(parent, availableWidth));
+                return name;
+            })
+            .map((name) => {
+                // Afterward, the preferred ones, if text takes still too much space
+                if (name.isPreferred === true) {
+                    if (this.measureText(text, fontSize, fontWeight) > availableWidth) {
+                        // Keep only the first letter
+                        name.label = name.label.slice(0, 1) + ".";
+                        text       = names.map(item => item.label).join(" ");
+                    }
+                }
 
-        // Truncate last names as last ones
-        parent.selectAll("tspan.lastName")
-            .each(this.truncateText(parent, availableWidth));
+                return name;
+            })
+            .map((name) => {
+                // Finally truncate lastnames
+                if (name.isLastName === true) {
+                    if (this.measureText(text, fontSize, fontWeight) > availableWidth) {
+                        // Keep only the first letter
+                        name.label = name.label.slice(0, 1) + ".";
+                        text       = names.map(item => item.label).join(" ");
+                    }
+                }
+
+                return name;
+            })
+            // Revert reversed order again
+            .reverse();
     }
 
     /**
-     * Truncates the textual content of the actual element.
+     * Measures the given text and return its width depending on the used font (including size and weight).
      *
-     * @param {selection} parent         The parent (<text> or <textPath>) element containing the <tspan> child elements
-     * @param {Number}    availableWidth The total available width the text could take
+     * @param {string} text
+     * @param {string} fontSize
+     * @param {number} fontWeight
+     *
+     * @returns {number}
+     *
+     * @private
      */
-    truncateText(parent, availableWidth)
+    measureText(text, fontSize, fontWeight = 400)
     {
-        let that = this;
+        const fontFamily = this._svg.style("font-family");
 
-        return function () {
-            let textLength = that.getTextLength(parent);
-            let tspan      = d3.select(this);
-            let words      = tspan.text().split(/\s+/);
-
-            // If the <tspan> contains multiple words, split them until available width matches
-            for (let i = words.length - 1; i >= 0; --i) {
-                if (textLength > availableWidth) {
-                    // Keep only the first letter
-                    words[i] = words[i].slice(0, 1) + ".";
-
-                    tspan.text(words.join(" "));
-
-                    // Recalculate text length
-                    textLength = that.getTextLength(parent);
-                }
-            }
-        };
-
-        // Truncate text letter by letter
-
-        // while ((textLength > availableWidth) && (text.length > 1)) {
-        //     // Remove last char
-        //     text = text.slice(0, -1);
-        //
-        //     if (text.length > 1) {
-        //         self.text(text + "...");
-        //     } else {
-        //         self.text(text + ".");
-        //     }
-        //
-        //     // Recalculate the text width
-        //     textLength = this.getTextLength(parent);
-        // }
+        return measureText(text, fontFamily, fontSize, fontWeight);
     }
 
     /**
      * Truncates a date value.
      *
-     * @param {selection} parent         The parent (<text> or <textPath>) element containing the <tspan> child elements
-     * @param {Number}    availableWidth The total available width the text could take
+     * @param {Selection} parent         The parent (<text> or <textPath>) element containing the <tspan> child elements
+     * @param {number}    availableWidth The total available width the text could take
      */
     truncateDate(parent, availableWidth)
     {
@@ -463,9 +525,9 @@ export default class Text
     /**
      * Returns a float representing the computed length of all <tspan> elements within the element.
      *
-     * @param {selection} parent The parent (<text> or <textPath>) element containing the <tspan> child elements
+     * @param {Selection} parent The parent (<text> or <textPath>) element containing the <tspan> child elements
      *
-     * @returns {Number}
+     * @returns {number}
      */
     getTextLength(parent)
     {
@@ -486,7 +548,7 @@ export default class Text
      *
      * @param {Object} data The D3 data object
      *
-     * @return {Boolean}
+     * @return {boolean}
      */
     isInnerLabel(data)
     {
@@ -497,18 +559,18 @@ export default class Text
     /**
      * Creates a new <path> definition and append it to the global definition list.
      *
-     * @param {String} parentId The parent element id
-     * @param {Number} index    Index position of an element in parent container. Required to create a unique path id.
+     * @param {string} parentId The parent element id
+     * @param {number} index    Index position of an element in parent container. Required to create a unique path id.
      * @param {Object} data     The D3 data object
      *
-     * @return {String} The id of the newly created path element
+     * @return {string} The id of the newly created path element
      */
     createPathDefinition(parentId, index, data)
     {
         let pathId = "path-" + parentId + "-" + index;
 
         // If definition already exists, return the existing path ID
-        if (this._svg.defs.get().select("path#" + pathId).node()) {
+        if (this._svg.defs.select("path#" + pathId).node()) {
             return pathId;
         }
 
@@ -535,9 +597,9 @@ export default class Text
             .padRadius(this._configuration.padRadius)
             .cornerRadius(this._configuration.cornerRadius);
 
-        // Store the <path> inside the definition list so we could
+        // Store the <path> inside the definition list, so we could
         // access it later on by its id
-        this._svg.defs.get()
+        this._svg.defs
             .append("path")
             .attr("id", pathId)
             .attr("d", arcGenerator);
@@ -548,11 +610,11 @@ export default class Text
     /**
      * Check for the 360-degree chart if the current arc labels should be flipped for easier reading.
      *
-     * @param {Number} depth The depth of the element inside the chart
-     * @param {Number} x0    The left edge (x0) of the rectangle
-     * @param {Number} x1    The right edge (x1) of the rectangle
+     * @param {number} depth The depth of the element inside the chart
+     * @param {number} x0    The left edge (x0) of the rectangle
+     * @param {number} x1    The right edge (x1) of the rectangle
      *
-     * @return {Boolean}
+     * @return {boolean}
      */
     isPositionFlipped(depth, x0, x1)
     {
@@ -572,17 +634,17 @@ export default class Text
      * Get the relative position offsets in percent for different text lines (firstName, lastName, dates).
      *   => (0 = inner radius, 100 = outer radius)
      *
-     * @param {Boolean} positionFlipped TRUE if the labels should be flipped for easier reading
-     * @param {Number}  index           The index position of element in parent container. Required to create a unique path id.
+     * @param {boolean} positionFlipped TRUE if the labels should be flipped for easier reading
+     * @param {number}  index           The index position of element in parent container. Required to create a unique path id.
      *
-     * @return {Number}
+     * @return {number}
      */
     getTextOffset(positionFlipped, index)
     {
-        // First names, Last name, Alternate name, Date, Parent marriage date
+        // First names, Last name, Alternative name, Date, Parent marriage date
         return positionFlipped
-            ? [23, 42, 61, 84, 125][index]
-            : [73, 54, 35, 12, 120][index];
+            ? [23, 40, 62, 84, 125][index]
+            : [73, 56, 34, 12, 120][index];
     }
 
     /**
@@ -590,9 +652,9 @@ export default class Text
      * the chart the available width differs.
      *
      * @param {Object} data  The D3 data object
-     * @param {Number} index The index position of element in parent container.
+     * @param {number} index The index position of element in parent container.
      *
-     * @returns {Number} Calculated available width
+     * @returns {number} Calculated available width
      *
      * @private
      */
@@ -623,7 +685,7 @@ export default class Text
      * Transform the D3 <text> elements in the group. Rotate each <text> element depending on its offset,
      * so that they are equally positioned inside the arc.
      *
-     * @param {selection} parent The D3 parent group object
+     * @param {Selection} parent The D3 parent group object
      * @param {Object}    datum  The The D3 data object
      *
      * @public
